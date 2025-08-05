@@ -12,23 +12,31 @@ const getAll = catchError(async (req, res) => {
 
 const create = catchError(async (req, res) => {
   const {
+    cI,
     email,
     password,
     firstName,
     lastName,
-    country,
-    image,
+    cellular,
+    dateBirth,
+    province,
+    city,
+    genre,
     isVerified,
     frontBaseUrl,
   } = req.body;
   const bcryptPassword = await bcrypt.hash(password, 10);
   const result = await User.create({
+    cI,
     email,
     password: bcryptPassword,
     firstName,
     lastName,
-    country,
-    image,
+    cellular,
+    dateBirth,
+    province,
+    city,
+    genre,
     isVerified,
   });
 
@@ -42,12 +50,12 @@ const create = catchError(async (req, res) => {
 
   await sendEmail({
     to: email,
-    subject: "Verificate email for user app",
+    subject: "Verificación de email para tu APP WEB REGISTROS BPA",
     html: `
-    <h1> Hello ${firstName}  ${lastName}</h1>
-        <h2>Thanks for sing up in user app</h2>
-        <p>To verify your account, like click the link below</p>
-        <a href="${link}" >${link}</a>`,
+    <h1> Hola ${firstName}  ${lastName}</h1>
+        <h2>Gracias por registrarte en la App Web Registros BPA</h2>
+        <p>Para verificar tu cuenta, da clik en el siguiente enlace</p>
+        <a href="${link}" >verificar cuenta</a>`,
   });
 
   return res.status(201).json(result);
@@ -67,16 +75,19 @@ const remove = catchError(async (req, res) => {
 });
 
 const update = catchError(async (req, res) => {
-  const { email, password, firstName, lastName, country, image, isVerified } =
+  const { cI, email, password, firstName, lastName, cellular, dateBirth, province, city, genre, isVerified } =
     req.body;
   const { id } = req.params;
   const result = await User.update(
     {
-      email,
+      cI,
       firstName,
       lastName,
-      country,
-      image,
+      cellular,
+      dateBirth,
+      province,
+      city,
+      genre,
       isVerified,
     },
     { where: { id }, returning: true }
@@ -88,25 +99,25 @@ const update = catchError(async (req, res) => {
 const login = catchError(async (req, res) => {
   const { email, password } = req.body;
   const user = await User.findOne({ where: { email: email } });
-  if (!user) return res.status(401).json({ mesagge: "Invalid user" });
+  if (!user) return res.status(401).json({ message: "Usuario Incorrecto" });
   const isValid = await bcrypt.compare(password, user.password);
-  if (!isValid) return res.status(401).json({ mesagge: "Invalid password" });
+  if (!isValid) return res.status(401).json({ message: "Contraseña Incorrecta" });
   if (!user.isVerified)
     return res
       .status(401)
-      .json({ mesagge: "The user has not verified his email" });
+      .json({ message: "El usuario no ha verificado su correo electrónico" });
 
   const token = jwt.sign({ user }, process.env.TOKEN_SECRET, {
     expiresIn: "1d",
   });
 
-  return res.json({ user, token });
+  return res.json({token });
 });
 
 const verifyCode = catchError(async (req, res) => {
   const { code } = req.params;
   const emailCode = await EmailCode.findOne({ where: { code: code } });
-  if (!emailCode) return res.status(401).json({ mesagge: "Invalid Code" });
+  if (!emailCode) return res.status(404).json({ message: "Código Incorrecto" });
 
   const user = await User.findByPk(emailCode.userId);
   user.isVerified = true;
@@ -119,18 +130,24 @@ const verifyCode = catchError(async (req, res) => {
 
   await emailCode.destroy();
 
-  return res.json(user);
+  return res.json({ message: "Usuario verificado correctamente", user });
 });
 
 const getLoggedUser = catchError(async (req, res) => {
   const loggedUser = req.user;
-  return res.json(loggedUser);
+  const id = loggedUser.id
+
+  const result = await User.findByPk(id);
+  if (!result) return res.sendStatus(404);
+
+
+  return res.json(result);
 });
 
 const sendEmailResetPassword = catchError(async (req, res) => {
   const { email, frontBaseUrl } = req.body;
   const user = await User.findOne({ where: { email: email } });
-  if (!user) return res.status(401).json({ mesagge: "Invalid User" });
+  if (!user) return res.status(401).json({ message: "Usuario Incorrecto" });
   const code = require("crypto").randomBytes(32).toString("hex");
   const link = `${frontBaseUrl}/${code}`;
   await EmailCode.create({
@@ -139,11 +156,11 @@ const sendEmailResetPassword = catchError(async (req, res) => {
   });
   await sendEmail({
     to: email,
-    subject: "Reset your password for the user application",
+    subject: "Restablecer su contraseña para la aplicación",
     html: `
-        <h1>Hello email user ${email}</h1>
-            <h2>To reset your password click on the following link</h2>
-            <a href="${link}" >${link}</a>`,
+        <h1>Hola usuario: ${email}</h1>
+            <h2>Para restablecer su contraseña haga clic en el siguiente enlace</h2>
+            <a href="${link}" >Reestablecer Contraseña</a>`,
   });
 
   return res.json(user);
@@ -153,7 +170,7 @@ const resetPassword = catchError(async (req, res) => {
   const { password } = req.body;
   const { code } = req.params;
   const emailCode = await EmailCode.findOne({ where: { code: code } });
-  if (!emailCode) return res.status(401).json({ mesagge: "Invalid Code" });
+  if (!emailCode) return res.status(401).json({ message: "Codigo Incorrecto" });
   const bcryptPassword = await bcrypt.hash(password, 10);
   const id = emailCode.userId;
 
